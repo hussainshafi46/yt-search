@@ -1,24 +1,27 @@
-import re
-import json
-import requests
-from requests.utils import requote_uri
+from re import search
+from json import loads
+from urllib.parse import quote
+from urllib.request import urlopen
 
 PATTERN = r'var ytInitialData =(.+)"targetId":"search-page"};</script>'
 
+def yt_search(query, top_k=1):
+    url = f"https://www.youtube.com/results?search_query={quote(query)}"
 
-def search(query, top_k=1):
-    url = f"https://www.youtube.com/results?search_query={requote_uri(query)}"
+    with urlopen(url) as response:
+        if response.status != 200:
+            print(f"Error: {response.status}")
+            exit(-1)
+        response_text = response.read().decode('utf-8')
 
-    response = requests.get(url)
-    if response.status_code != 200:
-        print(response)
-        exit(-1)
+    match = search(PATTERN, response_text)
+    if not match:
+        print("No data found.")
+        return []
 
-    yt_data = json.loads(re.search(PATTERN, response.text).group().lstrip("var ytInitialData =").rstrip(";</script>"))
+    yt_data = loads(match.group().lstrip("var ytInitialData =").rstrip(";</script>"))
 
-    media_list = \
-        yt_data["contents"]["twoColumnSearchResultsRenderer"]["primaryContents"]["sectionListRenderer"]["contents"][0][
-            "itemSectionRenderer"]["contents"]
+    media_list = yt_data["contents"]["twoColumnSearchResultsRenderer"]["primaryContents"]["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"]
 
     videos = [{
         "songId": media["videoRenderer"]["videoId"],
